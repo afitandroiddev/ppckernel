@@ -550,10 +550,37 @@ config KVM_CLOCK
 
 config KVM_GUEST
 	bool "KVM Guest support"
-	select PARAVIRT_ALL
+	select PARAVIRT
 	---help---
 	  This option enables various optimizations for running under the KVM
 	  hypervisor.
+
+config KVM_IODELAY
+	bool "KVM IO-delay support"
+	depends on KVM_GUEST
+	select PARAVIRT_CPU
+	---help---
+	  Usually we wait for PIO access to complete. When inside KVM there's
+	  no need to do that, as we know that we're not going through a bus,
+	  but process PIO requests instantly.
+
+	  This option disables PIO waits, but drags in CPU-bound pv-ops. Thus
+	  you will probably get more speed loss than speedup using this option.
+
+	  If in doubt, say N.
+
+config KVM_MMU
+	bool "KVM PV MMU support"
+	depends on KVM_GUEST
+	select PARAVIRT_MMU
+	---help---
+	  This option enables the paravirtualized MMU for KVM. In most cases
+	  it's pretty useless and shouldn't be used.
+
+	  It will only cost you performance, because it drags in pv-ops for
+	  memory management.
+
+	  If in doubt, say N.
 
 source "arch/x86/lguest/Kconfig"
 
