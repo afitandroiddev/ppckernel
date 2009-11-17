@@ -54,6 +54,6 @@ EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(__memcpy);
 
 EXPORT_SYMBOL(empty_zero_page);
-#ifndef CONFIG_PARAVIRT
+#ifndef CONFIG_PARAVIRT_CPU
 EXPORT_SYMBOL(native_load_gs_index);
 #endif
