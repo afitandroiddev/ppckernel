@@ -267,7 +267,7 @@ generic_mps_oem_check(struct mpc_table *mpc, char *oem, char *productid)
 		if (!apic_probe[i]->mps_oem_check(mpc, oem, productid))
 			continue;
 
-		if (!cmdline_apic) {
+		if (!cmdline_apic && apic == &apic_default) {
 			apic = apic_probe[i];
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
@@ -287,7 +287,7 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 		if (!apic_probe[i]->acpi_madt_oem_check(oem_id, oem_table_id))
 			continue;
 
-		if (!cmdline_apic) {
+		if (!cmdline_apic && apic == &apic_default) {
 			apic = apic_probe[i];
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
