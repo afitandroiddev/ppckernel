@@ -31,6 +31,9 @@ void grab_swap_token(struct mm_struct *mm)
 	int current_interval;
 
 	global_faults++;
+	if (mm == NULL)
+		return;
+
 
 	current_interval = global_faults - mm->faultstamp;
 
