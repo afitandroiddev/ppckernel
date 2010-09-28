@@ -386,6 +386,7 @@ static int hpet_next_event(unsigned long delta,
 	cnt += (u32) delta;
 	hpet_writel(cnt, HPET_Tn_CMP(timer));
 
+	hpet_readl(HPET_Tn_CMP(timer)); /* pre-read for bnc#433746 */
 	/*
 	 * We need to read back the CMP register on certain HPET
 	 * implementations (ATI chipsets) which seem to delay the
