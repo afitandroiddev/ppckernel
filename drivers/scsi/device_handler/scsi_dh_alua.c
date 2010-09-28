@@ -643,13 +643,12 @@ static int alua_activate(struct scsi_device *sdev,
 	struct alua_dh_data *h = get_alua_data(sdev);
 	int err = SCSI_DH_OK;
 
-	if (h->group_id != -1) {
-		err = alua_rtpg(sdev, h);
-		if (err != SCSI_DH_OK)
-			goto out;
-	}
+	err = alua_rtpg(sdev, h);
+	if (err != SCSI_DH_OK)
+		goto out;
 
-	if (h->tpgs & TPGS_MODE_EXPLICIT && h->state != TPGS_STATE_OPTIMIZED) {
+	if ((h->tpgs & TPGS_MODE_EXPLICIT) &&
+	    h->state != TPGS_STATE_OPTIMIZED) {
 		h->callback_fn = fn;
 		h->callback_data = data;
 		err = submit_stpg(h);
