@@ -290,6 +290,11 @@ int br_add_bridge(struct net *net, const char *name)
 	if (!dev)
 		return -ENOMEM;
 
+	if (!try_module_get(THIS_MODULE)) {
+		free_netdev(dev);
+		return -ENOENT;
+	}
+
 	rtnl_lock();
 	if (strchr(dev->name, '%')) {
 		ret = dev_alloc_name(dev, dev->name);
@@ -308,6 +313,8 @@ int br_add_bridge(struct net *net, const char *name)
 		unregister_netdevice(dev);
  out:
 	rtnl_unlock();
+	if (ret)
+		module_put(THIS_MODULE);
 	return ret;
 
 out_free:
@@ -339,6 +346,8 @@ int br_del_bridge(struct net *net, const char *name)
 		del_br(netdev_priv(dev), NULL);
 
 	rtnl_unlock();
+	if (ret == 0)
+		module_put(THIS_MODULE);
 	return ret;
 }
 
