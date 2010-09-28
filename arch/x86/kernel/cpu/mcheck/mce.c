@@ -96,8 +96,8 @@ static char			*mce_helper_argv[2] = { mce_helper, NULL };
 static DECLARE_WAIT_QUEUE_HEAD(mce_wait);
 static DEFINE_PER_CPU(struct mce, mces_seen);
 static int			cpu_missing;
-void				(*cpu_specific_poll)(struct mce *);
-EXPORT_SYMBOL_GPL(cpu_specific_poll);
+void				(*mce_cpu_specific_poll)(struct mce *);
+EXPORT_SYMBOL_GPL(mce_cpu_specific_poll);
 
 /*
  * CPU/chipset specific EDAC code can register a notifier call here to print
@@ -602,8 +602,8 @@ void machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 		if (!(flags & MCP_TIMESTAMP))
 			m.tsc = 0;
 
-		if (cpu_specific_poll && !under_injection() && !mce_dont_log_ce)
-			cpu_specific_poll(&m);
+		if (mce_cpu_specific_poll && !under_injection() && !mce_dont_log_ce)
+			mce_cpu_specific_poll(&m);
 
 		/*
 		 * Don't get the IP here because it's unlikely to
