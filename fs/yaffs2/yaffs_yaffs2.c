@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yaffs_yaffs2.c
+/home/redstar/Droid/androkern/yaffs2/yaffs_yaffs2.c

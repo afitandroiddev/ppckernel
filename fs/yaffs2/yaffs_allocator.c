@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yaffs_allocator.c
+/home/redstar/Droid/androkern/yaffs2/yaffs_allocator.c

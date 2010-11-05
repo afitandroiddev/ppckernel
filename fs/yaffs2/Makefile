@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/Makefile.kernel
+/home/redstar/Droid/androkern/yaffs2/Makefile.kernel
