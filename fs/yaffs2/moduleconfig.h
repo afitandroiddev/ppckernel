@@ -1,0 +1,1 @@
+/home/redstar/Droid/androkern/yaffs2/moduleconfig.h

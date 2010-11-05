@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yportenv_multi.h
+/home/redstar/Droid/androkern/yaffs2/yportenv_multi.h

@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yaffs_packedtags1.c
+/home/redstar/Droid/androkern/yaffs2/yaffs_packedtags1.c

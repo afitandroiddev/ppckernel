@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yaffs_trace.h
+/home/redstar/Droid/androkern/yaffs2/yaffs_trace.h

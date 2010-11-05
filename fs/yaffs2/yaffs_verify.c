@@ -1,1 +1,1 @@
-/mnt/Source/nexuskernel/yaffs2/yaffs_verify.c
+/home/redstar/Droid/androkern/yaffs2/yaffs_verify.c
