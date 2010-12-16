@@ -30,7 +30,11 @@
 #define AVS_H
 
 #define VOLTAGE_MIN  950 /* mV */
-#define VOLTAGE_MAX  1275
+#ifdef CONFIG_JESUS_PHONE
+#define VOLTAGE_MAX  1300
+#else
+#define VOLTAGE_MAX 1275
+#endif
 #define VOLTAGE_STEP 25
 
 int __init avs_init(int (*set_vdd)(int), u32 freq_cnt, u32 freq_idx);
