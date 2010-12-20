@@ -137,6 +137,12 @@ static cycle_t msm_dgt_read(struct clocksource *cs)
 	return (msm_read_timer_count(clock) + clock->offset) >> MSM_DGT_SHIFT;
 }
 
+int read_current_timer(unsigned long *timer_val)
+{
+	*timer_val = readl(MSM_DGT_BASE + TIMER_COUNT_VAL);
+	return 0;
+}
+
 static int msm_timer_set_next_event(unsigned long cycles,
 				    struct clock_event_device *evt)
 {
@@ -543,6 +549,12 @@ unsigned long long sched_clock(void)
 	#define DG_TIMER_RATING 300
 #endif
 
+static void msm_timer_set_mode_nop(enum clock_event_mode mode,
+				struct clock_event_device *evt)
+{
+	/* The timer is always ticking so do nothing */
+}
+
 static struct msm_clock msm_clocks[] = {
 	[MSM_CLOCK_GPT] = {
 		.clockevent = {
@@ -584,7 +596,7 @@ static struct msm_clock msm_clocks[] = {
 			.shift          = 32 + MSM_DGT_SHIFT,
 			.rating         = DG_TIMER_RATING,
 			.set_next_event = msm_timer_set_next_event,
-			.set_mode       = msm_timer_set_mode,
+			.set_mode       = msm_timer_set_mode_nop,
 		},
 		.clocksource = {
 			.name           = "dg_timer",
@@ -704,6 +716,8 @@ static void __init msm_timer_init(void)
 
 		clockevents_register_device(ce);
 	}
+	writel(TIMER_ENABLE_EN, MSM_DGT_BASE + TIMER_ENABLE);
+	set_delay_fn(read_current_timer_delay_loop);
 }
 
 struct sys_timer msm_timer = {
