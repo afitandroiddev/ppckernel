@@ -170,8 +170,8 @@ struct msmsdcc_dma_data {
 
 	int				channel;
 	struct msmsdcc_host		*host;
-	int				busy; /* Set if DM is busy */
-	int				active;
+	bool				busy; /* Set if DM is busy */
+	bool				active;
 };
 
 struct msmsdcc_pio_data {
@@ -187,8 +187,8 @@ struct msmsdcc_curr_req {
 	unsigned int		xfer_size;	/* Total data size */
 	unsigned int		xfer_remain;	/* Bytes remaining to send */
 	unsigned int		data_xfered;	/* Bytes acked by BLKEND irq */
-	int			got_dataend;
-	int			got_datablkend;
+	bool			got_dataend;
+	bool			got_datablkend;
 	int			user_pages;
 };
 
@@ -232,7 +232,7 @@ struct msmsdcc_host {
 
 	struct msmsdcc_dma_data	dma;
 	struct msmsdcc_pio_data	pio;
-	int			cmdpoll;
+	bool			cmdpoll;
 	struct msmsdcc_stats	stats;
 
 #ifdef CONFIG_MMC_MSM7X00A_RESUME_IN_WQ

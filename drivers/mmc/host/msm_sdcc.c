@@ -61,7 +61,7 @@ static unsigned int msmsdcc_sdioirq;
 #define PIO_SPINMAX 30
 #define CMD_SPINMAX 20
 
-
+#ifdef BUSCLK_PWRSAVE
 static inline void
 msmsdcc_disable_clocks(struct msmsdcc_host *host, int deferr)
 {
@@ -79,10 +79,14 @@ msmsdcc_disable_clocks(struct msmsdcc_host *host, int deferr)
 		if (host->clks_on) {
 			clk_disable(host->clk);
 			clk_disable(host->pclk);
-			host->clks_on = 0;
+			host->clks_on = false;
 		}
 	}
 }
+#else
+static inline void
+msmsdcc_disable_clocks(struct msmsdcc_host *host, int deferr) { }
+#endif
 
 static inline int
 msmsdcc_enable_clocks(struct msmsdcc_host *host)
@@ -102,7 +106,7 @@ msmsdcc_enable_clocks(struct msmsdcc_host *host)
 		}
 		udelay(1 + ((3 * USEC_PER_SEC) /
 		       (host->clk_rate ? host->clk_rate : msmsdcc_fmin)));
-		host->clks_on = 1;
+		host->clks_on = true;
 	}
 	return 0;
 }
@@ -139,9 +143,8 @@ msmsdcc_request_end(struct msmsdcc_host *host, struct mmc_request *mrq)
 	if (mrq->cmd->error == -ETIMEDOUT)
 		mdelay(5);
 
-#if BUSCLK_PWRSAVE
 	msmsdcc_disable_clocks(host, 1);
-#endif
+
 	/*
 	 * Need to drop the host lock here; mmc_request_done may call
 	 * back into the driver...
@@ -155,7 +158,7 @@ static void
 msmsdcc_stop_data(struct msmsdcc_host *host)
 {
 	host->curr.data = NULL;
-	host->curr.got_dataend = host->curr.got_datablkend = 0;
+	host->curr.got_dataend = host->curr.got_datablkend = false;
 }
 
 uint32_t msmsdcc_fifo_addr(struct msmsdcc_host *host)
@@ -176,8 +179,8 @@ uint32_t msmsdcc_fifo_addr(struct msmsdcc_host *host)
 
 static inline void
 msmsdcc_start_command_exec(struct msmsdcc_host *host, u32 arg, u32 c) {
-       msmsdcc_writel(host, arg, MMCIARGUMENT);
-       msmsdcc_writel(host, c, MMCICOMMAND);
+	msmsdcc_writel(host, arg, MMCIARGUMENT);
+	msmsdcc_writel(host, c, MMCICOMMAND);
 }
 
 static void
@@ -196,7 +199,7 @@ msmsdcc_dma_exec_func(struct msm_dmov_cmd *cmd)
 					   (u32) host->cmd_cmd->arg,
 					   (u32) host->cmd_c);
 	}
-	host->dma.active = 1;
+	host->dma.active = true;
 }
 
 static void
@@ -211,7 +214,7 @@ msmsdcc_dma_complete_func(struct msm_dmov_cmd *cmd,
 	struct mmc_request	*mrq;
 
 	spin_lock_irqsave(&host->lock, flags);
-	host->dma.active = 0;
+	host->dma.active = false;
 
 	mrq = host->curr.mrq;
 	BUG_ON(!mrq);
@@ -251,7 +254,7 @@ msmsdcc_dma_complete_func(struct msm_dmov_cmd *cmd,
 	}
 
 	host->dma.sg = NULL;
-	host->dma.busy = 0;
+	host->dma.busy = false;
 
 	if ((host->curr.got_dataend && host->curr.got_datablkend)
 	     || mrq->data->error) {
@@ -269,10 +272,10 @@ msmsdcc_dma_complete_func(struct msm_dmov_cmd *cmd,
 			host->curr.cmd = NULL;
 			mrq->data->bytes_xfered = host->curr.data_xfered;
 
-			spin_unlock_irqrestore(&host->lock, flags);
-#if BUSCLK_PWRSAVE
 			msmsdcc_disable_clocks(host, 1);
-#endif
+
+			spin_unlock_irqrestore(&host->lock, flags);
+
 			mmc_request_done(host->mmc, mrq);
 			return;
 		} else
@@ -313,7 +316,7 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
 	host->dma.sg = data->sg;
 	host->dma.num_ents = data->sg_len;
 
-       BUG_ON(host->dma.num_ents > NR_SG); /* Prevent memory corruption */
+	BUG_ON(host->dma.num_ents > NR_SG); /* Prevent memory corruption */
 
 	nc = host->dma.nc;
 
@@ -347,12 +350,12 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
 	for (i = 0; i < host->dma.num_ents; i++) {
 		box->cmd = CMD_MODE_BOX;
 
-	/* Initialize sg dma address */
-	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
-				+ sg->offset;
+		/* Initialize sg dma address */
+		sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+					+ sg->offset;
 
-	if (i == (host->dma.num_ents - 1))
-			box->cmd |= CMD_LC;
+		if (i == (host->dma.num_ents - 1))
+				box->cmd |= CMD_LC;
 		rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
 			(sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
 			(sg_dma_len(sg) / MCI_FIFOSIZE) ;
@@ -461,8 +464,8 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 	host->curr.xfer_size = data->blksz * data->blocks;
 	host->curr.xfer_remain = host->curr.xfer_size;
 	host->curr.data_xfered = 0;
-	host->curr.got_dataend = 0;
-	host->curr.got_datablkend = 0;
+	host->curr.got_dataend = false;
+	host->curr.got_datablkend = false;
 
 	memset(&host->pio, 0, sizeof(host->pio));
 
@@ -488,7 +491,7 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 
 	clks = (unsigned long long)data->timeout_ns * host->clk_rate;
 	do_div(clks, NSEC_PER_SEC);
-	timeout = data->timeout_clks + (unsigned int)clks*2 ;
+	timeout = data->timeout_clks + (unsigned int)clks*2;
 
 	if (datactrl & MCI_DPSM_DMAENABLE) {
 		/* Save parameters for the exec function */
@@ -499,7 +502,7 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 
 		host->dma.hdr.execute_func = msmsdcc_dma_exec_func;
 		host->dma.hdr.data = (void *)host;
-		host->dma.busy = 1;
+		host->dma.busy = true;
 
 		if (cmd) {
 			msmsdcc_start_command_deferred(host, cmd, &c);
@@ -572,7 +575,7 @@ msmsdcc_pio_read(struct msmsdcc_host *host, char *buffer, unsigned int remain)
 		ptr++;
 		count += sizeof(uint32_t);
 
-		remain -=  sizeof(uint32_t);
+		remain -= sizeof(uint32_t);
 		if (remain == 0)
 			break;
 	}
@@ -758,10 +761,10 @@ msmsdcc_handle_irq_data(struct msmsdcc_host *host, u32 status,
 
 	/* Check for data done */
 	if (!host->curr.got_dataend && (status & MCI_DATAEND))
-		host->curr.got_dataend = 1;
+		host->curr.got_dataend = true;
 
 	if (!host->curr.got_datablkend && (status & MCI_DATABLOCKEND))
-		host->curr.got_datablkend = 1;
+		host->curr.got_datablkend = true;
 
 	/*
 	 * If DMA is still in progress, we complete via the completion handler
@@ -798,7 +801,7 @@ msmsdcc_irq(int irq, void *dev_id)
 	void __iomem		*base = host->base;
 	u32			status;
 	int			ret = 0;
-	int			cardint = 0;
+	bool			cardint = false;
 
 	spin_lock(&host->lock);
 
@@ -817,7 +820,7 @@ msmsdcc_irq(int irq, void *dev_id)
 		msmsdcc_handle_irq_data(host, status, base);
 
 		if (status & MCI_SDIOINTOPER) {
-			cardint = 1;
+			cardint = true;
 			status &= ~MCI_SDIOINTOPER;
 		}
 		ret = 1;
@@ -942,9 +945,9 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		host->pwr = pwr;
 		msmsdcc_writel(host, pwr, MMCIPOWER);
 	}
-#if BUSCLK_PWRSAVE
+
 	msmsdcc_disable_clocks(host, 1);
-#endif
+
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
@@ -1132,7 +1135,7 @@ msmsdcc_probe(struct platform_device *pdev)
 	host->mmc = mmc;
 	host->curr.cmd = NULL;
 
-	host->cmdpoll = 1;
+	host->cmdpoll = true;
 
 	host->base = ioremap(memres->start, PAGE_SIZE);
 	if (!host->base) {
@@ -1298,9 +1301,8 @@ msmsdcc_probe(struct platform_device *pdev)
 	if (host->timer.function)
 		pr_info("%s: Polling status mode enabled\n", mmc_hostname(mmc));
 
-#if BUSCLK_PWRSAVE
 	msmsdcc_disable_clocks(host, 1);
-#endif
+
 	return 0;
  cmd_irq_free:
 	free_irq(cmd_irqres->start, host);
@@ -1360,9 +1362,9 @@ msmsdcc_resume(struct platform_device *dev)
 			mmc_resume_host(mmc);
 		if (host->stat_irq)
 			enable_irq(host->stat_irq);
-#if BUSCLK_PWRSAVE
+
 		msmsdcc_disable_clocks(host, 1);
-#endif
+
 	}
 	return 0;
 }
