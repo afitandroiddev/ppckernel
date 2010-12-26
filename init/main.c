@@ -834,6 +834,9 @@ static noinline int init_post(void)
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
+	print_kernel_version();
+	print_redstar_version();
+	print_avs_status();
 
 	current->signal->flags |= SIGNAL_UNKILLABLE;
 

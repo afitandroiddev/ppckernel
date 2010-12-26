@@ -1524,6 +1524,37 @@ struct task_struct {
 #endif
 };
 
+#ifdef CONFIG_JESUS_PHONE
+static inline void print_kernel_version(void)
+{
+	printk(KERN_INFO"This kernel allows CPU overclocking to 1113mhz, Please exercise caution!\n");
+	printk(KERN_INFO"Built with EXTREME bacon-coocking power!\n");
+}
+#else
+static inline void print_kernel_version(void)
+{
+	printk(KERN_INFO"This kernel is built with bacon-cooking power!\n");
+}
+#endif /* CONFIG_JESUS_PHONE */
+
+static inline void print_redstar_version(void)
+{
+	printk(KERN_INFO"Built by redstar for the QSD8250 Snapdragon\n");
+}
+
+#ifdef CONFIG_MSM_CPU_AVS
+static inline void print_avs_status(void)
+{
+	printk(KERN_INFO"Scorpion Adaptive Voltage Scaling is Enabled\n");
+	printk(KERN_INFO"Ready to bring the Rain\n");
+}
+#else
+{
+	printk(KERN_INFO"Scorpion Static Voltage Scaling is Enabled\n");
+	printk(KERN_INFO"Time to drop the Hammer\n");
+}
+#endif /* CONFIG_MSM_CPU_AVS */
+
 static inline void sched_wake_interactive_enable(void)
 {
 	current->sched_wake_interactive++;
