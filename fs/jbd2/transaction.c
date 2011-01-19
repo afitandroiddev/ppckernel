@@ -222,7 +222,7 @@ repeat:
 		atomic_sub(nblocks, &transaction->t_outstanding_credits);
 		prepare_to_wait(&journal->j_wait_transaction_locked, &wait,
 				TASK_UNINTERRUPTIBLE);
-		__jbd2_log_start_commit(journal, transaction->t_tid);
+		__jbd2_log_start_commit(journal, transaction->t_tid, false);
 		read_unlock(&journal->j_state_lock);
 		schedule();
 		finish_wait(&journal->j_wait_transaction_locked, &wait);
@@ -467,7 +467,7 @@ int jbd2__journal_restart(handle_t *handle, int nblocks, int gfp_mask)
 	spin_unlock(&transaction->t_handle_lock);
 
 	jbd_debug(2, "restarting handle %p\n", handle);
-	__jbd2_log_start_commit(journal, transaction->t_tid);
+	__jbd2_log_start_commit(journal, transaction->t_tid, false);
 	read_unlock(&journal->j_state_lock);
 
 	lock_map_release(&handle->h_lockdep_map);
@@ -1363,8 +1363,6 @@ int jbd2_journal_stop(handle_t *handle)
 		}
 	}
 
-	if (handle->h_sync)
-		transaction->t_synchronous_commit = 1;
 	current->journal_info = NULL;
 	atomic_sub(handle->h_buffer_credits,
 		   &transaction->t_outstanding_credits);
@@ -1385,15 +1383,16 @@ int jbd2_journal_stop(handle_t *handle)
 
 		jbd_debug(2, "transaction too old, requesting commit for "
 					"handle %p\n", handle);
-		/* This is non-blocking */
-		jbd2_log_start_commit(journal, transaction->t_tid);
-
 		/*
 		 * Special case: JBD2_SYNC synchronous updates require us
 		 * to wait for the commit to complete.
 		 */
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
 			wait_for_commit = 1;
+
+		/* This is non-blocking */
+		jbd2_log_start_commit(journal, transaction->t_tid,
+				      wait_for_commit);
 	}
 
 	/*

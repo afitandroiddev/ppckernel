@@ -198,7 +198,7 @@ int ext4_sync_file(struct file *file, int datasync)
 		return ext4_force_commit(inode->i_sb);
 
 	commit_tid = datasync ? ei->i_datasync_tid : ei->i_sync_tid;
-	if (jbd2_log_start_commit(journal, commit_tid)) {
+	if (jbd2_log_start_commit(journal, commit_tid, true)) {
 		/*
 		 * When the journal is on a different device than the
 		 * fs data disk, we need to issue the barrier in

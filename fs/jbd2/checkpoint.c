@@ -309,7 +309,7 @@ static int __process_buffer(journal_t *journal, struct journal_head *jh,
 			       "Waiting for Godot: block %llu\n",
 			       journal->j_devname,
 			       (unsigned long long) bh->b_blocknr);
-		jbd2_log_start_commit(journal, tid);
+		jbd2_log_start_commit(journal, tid, true);
 		jbd2_log_wait_commit(journal, tid);
 		ret = 1;
 	} else if (!buffer_dirty(bh)) {

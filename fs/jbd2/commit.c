@@ -329,7 +329,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	int tag_bytes = journal_tag_bytes(journal);
 	struct buffer_head *cbh = NULL; /* For transactional checksums */
 	__u32 crc32_sum = ~0;
-	int write_op = WRITE_SYNC;
+	int write_op = WRITE;
 
 	/*
 	 * First job: lock down the current transaction and wait for
@@ -368,7 +368,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	 * we unplug the device. We don't do explicit unplugging in here,
 	 * instead we rely on sync_buffer() doing the unplug for us.
 	 */
-	if (commit_transaction->t_synchronous_commit)
+	if (tid_geq(journal->j_commit_waited, commit_transaction->t_tid))
 		write_op = WRITE_SYNC_PLUG;
 	trace_jbd2_commit_locking(journal, commit_transaction);
 	stats.run.rs_wait = commit_transaction->t_max_wait;
