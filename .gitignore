@@ -57,6 +57,8 @@ modules.builtin
 include/config
 include/linux/version.h
 include/generated
+maker
+mainmaker
 
 # stgit generated dirs
 patches-*
