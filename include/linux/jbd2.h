@@ -631,6 +631,11 @@ struct transaction_s
 	 */
 	atomic_t		t_handle_count;
 
+	/*
+	 * This transaction is being forced and some process is
+	 * waiting for it to finish.
+	 */
+	unsigned int t_synchronous_commit:1;
 	unsigned int t_flushed_data_blocks:1;
 
 	/*
@@ -893,13 +898,6 @@ struct journal_s
 	 * [j_state_lock]
 	 */
 	tid_t			j_commit_request;
-
-	/*
-	 * Sequence number of the most recent transaction someone is waiting
-	 * for to commit.
-	 * [j_state_lock]
-	 */
-	tid_t			j_commit_waited;
 
 	/*
 	 * Journal uuid: identifies the object (filesystem, LVM volume etc)
@@ -1186,9 +1184,9 @@ extern void	jbd2_journal_switch_revoke_table(journal_t *journal);
  */
 
 int __jbd2_log_space_left(journal_t *); /* Called with journal locked */
-int jbd2_log_start_commit(journal_t *journal, tid_t tid, bool will_wait);
-int __jbd2_log_start_commit(journal_t *journal, tid_t tid, bool will_wait);
-int jbd2_journal_start_commit(journal_t *journal, tid_t *tid, bool will_wait);
+int jbd2_log_start_commit(journal_t *journal, tid_t tid);
+int __jbd2_log_start_commit(journal_t *journal, tid_t tid);
+int jbd2_journal_start_commit(journal_t *journal, tid_t *tid);
 int jbd2_journal_force_commit_nested(journal_t *journal);
 int jbd2_log_wait_commit(journal_t *journal, tid_t tid);
 int jbd2_log_do_checkpoint(journal_t *journal);

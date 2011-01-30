@@ -473,7 +473,7 @@ int __jbd2_log_space_left(journal_t *journal)
 /*
  * Called under j_state_lock.  Returns true if a transaction commit was started.
  */
-int __jbd2_log_start_commit(journal_t *journal, tid_t target, bool will_wait)
+int __jbd2_log_start_commit(journal_t *journal, tid_t target)
 {
 	/*
 	 * Are we already doing a recent enough commit?
@@ -483,8 +483,7 @@ int __jbd2_log_start_commit(journal_t *journal, tid_t target, bool will_wait)
 		 * We want a new commit: OK, mark the request and wakeup the
 		 * commit thread.  We do _not_ do the commit ourselves.
 		 */
-		if (will_wait && !tid_geq(journal->j_commit_waited, target))
-			journal->j_commit_waited = target;
+
 		journal->j_commit_request = target;
 		jbd_debug(1, "JBD: requesting commit %d/%d\n",
 			  journal->j_commit_request,
@@ -495,12 +494,12 @@ int __jbd2_log_start_commit(journal_t *journal, tid_t target, bool will_wait)
 	return 0;
 }
 
-int jbd2_log_start_commit(journal_t *journal, tid_t tid, bool will_wait)
+int jbd2_log_start_commit(journal_t *journal, tid_t tid)
 {
 	int ret;
 
 	write_lock(&journal->j_state_lock);
-	ret = __jbd2_log_start_commit(journal, tid, will_wait);
+	ret = __jbd2_log_start_commit(journal, tid);
 	write_unlock(&journal->j_state_lock);
 	return ret;
 }
@@ -523,7 +522,7 @@ int jbd2_journal_force_commit_nested(journal_t *journal)
 	read_lock(&journal->j_state_lock);
 	if (journal->j_running_transaction && !current->journal_info) {
 		transaction = journal->j_running_transaction;
-		__jbd2_log_start_commit(journal, transaction->t_tid, true);
+		__jbd2_log_start_commit(journal, transaction->t_tid);
 	} else if (journal->j_committing_transaction)
 		transaction = journal->j_committing_transaction;
 
@@ -543,7 +542,7 @@ int jbd2_journal_force_commit_nested(journal_t *journal)
  * if a transaction is going to be committed (or is currently already
  * committing), and fills its tid in at *ptid
  */
-int jbd2_journal_start_commit(journal_t *journal, tid_t *ptid, bool will_wait)
+int jbd2_journal_start_commit(journal_t *journal, tid_t *ptid)
 {
 	int ret = 0;
 
@@ -551,7 +550,7 @@ int jbd2_journal_start_commit(journal_t *journal, tid_t *ptid, bool will_wait)
 	if (journal->j_running_transaction) {
 		tid_t tid = journal->j_running_transaction->t_tid;
 
-		__jbd2_log_start_commit(journal, tid, will_wait);
+		__jbd2_log_start_commit(journal, tid);
 		/* There's a running transaction and we've just made sure
 		 * it's commit has been scheduled. */
 		if (ptid)
@@ -1560,7 +1559,7 @@ int jbd2_journal_flush(journal_t *journal)
 	/* Force everything buffered to the log... */
 	if (journal->j_running_transaction) {
 		transaction = journal->j_running_transaction;
-		__jbd2_log_start_commit(journal, transaction->t_tid, true);
+		__jbd2_log_start_commit(journal, transaction->t_tid);
 	} else if (journal->j_committing_transaction)
 		transaction = journal->j_committing_transaction;
 
@@ -1676,7 +1675,7 @@ void __jbd2_journal_abort_hard(journal_t *journal)
 	journal->j_flags |= JBD2_ABORT;
 	transaction = journal->j_running_transaction;
 	if (transaction)
-		__jbd2_log_start_commit(journal, transaction->t_tid, false);
+		__jbd2_log_start_commit(journal, transaction->t_tid);
 	write_unlock(&journal->j_state_lock);
 }
 

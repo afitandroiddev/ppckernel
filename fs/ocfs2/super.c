@@ -414,7 +414,7 @@ static int ocfs2_sync_fs(struct super_block *sb, int wait)
 	}
 
 	if (jbd2_journal_start_commit(OCFS2_SB(sb)->journal->j_journal,
-				      &target, wait)) {
+				      &target)) {
 		if (wait)
 			jbd2_log_wait_commit(OCFS2_SB(sb)->journal->j_journal,
 					     target);
