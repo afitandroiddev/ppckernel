@@ -3839,6 +3839,7 @@ static void rebalance_domains(int cpu, enum cpu_idle_type idle)
 				idle = CPU_NOT_IDLE;
 			}
 			sd->last_balance = jiffies;
+			sd->bubble_up_idle = idle;
 		}
 		if (need_serialize)
 			spin_unlock(&balancing);
@@ -3855,6 +3856,9 @@ out:
 		 */
 		if (!balance)
 			break;
+
+		if (idle == CPU_IDLE)
+			idle = sd->bubble_up_idle;
 	}
 
 	/*

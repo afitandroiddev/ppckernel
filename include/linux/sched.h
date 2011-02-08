@@ -932,6 +932,7 @@ struct sched_domain {
 	unsigned int nr_balance_failed; /* initialise to 0 */
 
 	u64 last_update;
+	enum cpu_idle_type bubble_up_idle;
 
 #ifdef CONFIG_SCHEDSTATS
 	/* load_balance() stats */
