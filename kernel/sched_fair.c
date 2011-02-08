@@ -2602,6 +2602,34 @@ fix_small_capacity(struct sched_domain *sd, struct sched_group *group)
 	return 0;
 }
 
+/*
+ * Find if there is any busy CPUs in SD_SHARE_CPUPOWER domain of
+ * requested CPU.
+ * Bypass the check in case of SD_POWERSAVINGS_BALANCE on
+ * parent domain. In that case requested CPU can still be nominated as
+ * balancer for higher domains.
+ */
+static int is_cpupower_sharing_domain_idle(int cpu)
+{
+	struct sched_domain *sd;
+	int i;
+
+	for_each_domain(cpu, sd) {
+		if (!(sd->flags & SD_SHARE_CPUPOWER))
+			break;
+
+		if (test_sd_parent(sd, SD_POWERSAVINGS_BALANCE))
+			return 1;
+
+		for_each_cpu(i, sched_domain_span(sd)) {
+			if (!idle_cpu(i))
+				return 0;
+		}
+	}
+
+	return 1;
+}
+
 /**
  * update_sg_lb_stats - Update sched_group's statistics for load balancing.
  * @sd: The sched_domain whose statistics are to be updated.
@@ -2623,6 +2651,7 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 	unsigned long load, max_cpu_load, min_cpu_load, max_nr_running;
 	int i;
 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
+	unsigned int first_semiidle_cpu = 0;
 	unsigned long avg_load_per_task = 0;
 
 	if (local_group)
@@ -2639,8 +2668,13 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 		/* Bias balancing toward cpus of our domain */
 		if (local_group) {
 			if (idle_cpu(i) && !first_idle_cpu) {
-				first_idle_cpu = 1;
-				balance_cpu = i;
+				if (is_cpupower_sharing_domain_idle(i)) {
+					first_idle_cpu = 1;
+					balance_cpu = i;
+				} else if (!first_semiidle_cpu) {
+					first_semiidle_cpu = 1;
+					balance_cpu = i;
+				}
 			}
 
 			load = target_load(i, load_idx);
