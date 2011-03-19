@@ -21,7 +21,8 @@
 #define CLONE_DETACHED		0x00400000	/* Unused, ignored */
 #define CLONE_UNTRACED		0x00800000	/* set if the tracing process can't force CLONE_PTRACE on this clone */
 #define CLONE_CHILD_SETTID	0x01000000	/* set the TID in the child */
-#define CLONE_STOPPED		0x02000000	/* Start in stopped state */
+/* 0x02000000 was previously the unused CLONE_STOPPED (Start in stopped state)
+   and is now available for re-use. */
 #define CLONE_NEWUTS		0x04000000	/* New utsname group? */
 #define CLONE_NEWIPC		0x08000000	/* New ipcs */
 #define CLONE_NEWUSER		0x10000000	/* New user namespace */
@@ -509,6 +510,8 @@ struct thread_group_cputimer {
 	spinlock_t lock;
 };
 
+struct autogroup;
+
 /*
  * NOTE! "signal_struct" does not have it's own
  * locking, because a shared signal_struct always
@@ -576,6 +579,9 @@ struct signal_struct {
 
 	struct tty_struct *tty; /* NULL if no tty */
 
+#ifdef CONFIG_SCHED_AUTOGROUP
+	struct autogroup *autogroup;
+#endif
 	/*
 	 * Cumulative resource counters for dead threads in the group,
 	 * and for reaped dead child processes forked by this group.
@@ -926,6 +932,7 @@ struct sched_domain {
 	unsigned int nr_balance_failed; /* initialise to 0 */
 
 	u64 last_update;
+	enum cpu_idle_type bubble_up_idle;
 
 #ifdef CONFIG_SCHEDSTATS
 	/* load_balance() stats */
@@ -1073,12 +1080,10 @@ struct sched_class {
 	void (*task_tick) (struct rq *rq, struct task_struct *p, int queued);
 	void (*task_fork) (struct task_struct *p);
 
-	void (*switched_from) (struct rq *this_rq, struct task_struct *task,
-			       int running);
-	void (*switched_to) (struct rq *this_rq, struct task_struct *task,
-			     int running);
+	void (*switched_from) (struct rq *this_rq, struct task_struct *task);
+	void (*switched_to) (struct rq *this_rq, struct task_struct *task);
 	void (*prio_changed) (struct rq *this_rq, struct task_struct *task,
-			     int oldprio, int running);
+			     int oldprio);
 
 	unsigned int (*get_rr_interval) (struct rq *rq,
 					 struct task_struct *task);
@@ -1238,7 +1243,9 @@ struct task_struct {
 #endif
 
 	struct list_head tasks;
+#ifdef CONFIG_SMP
 	struct plist_node pushable_tasks;
+#endif
 
 	struct mm_struct *mm, *active_mm;
 #if defined(SPLIT_RSS_COUNTING)
@@ -1882,13 +1889,10 @@ extern void sched_clock_idle_sleep_event(void);
 extern void sched_clock_idle_wakeup_event(u64 delta_ns);
 
 #ifdef CONFIG_HOTPLUG_CPU
-extern void move_task_off_dead_cpu(int dead_cpu, struct task_struct *p);
 extern void idle_task_exit(void);
 #else
 static inline void idle_task_exit(void) {}
 #endif
-
-extern void sched_idle_next(void);
 
 #if defined(CONFIG_NO_HZ) && defined(CONFIG_SMP)
 extern void wake_up_idle_cpu(int cpu);
@@ -1899,8 +1903,6 @@ static inline void wake_up_idle_cpu(int cpu) { }
 extern unsigned int sysctl_sched_latency;
 extern unsigned int sysctl_sched_min_granularity;
 extern unsigned int sysctl_sched_wakeup_granularity;
-extern unsigned int sysctl_sched_shares_ratelimit;
-extern unsigned int sysctl_sched_shares_thresh;
 extern unsigned int sysctl_sched_child_runs_first;
 
 enum sched_tunable_scaling {
@@ -1916,6 +1918,7 @@ extern unsigned int sysctl_sched_migration_cost;
 extern unsigned int sysctl_sched_nr_migrate;
 extern unsigned int sysctl_sched_time_avg;
 extern unsigned int sysctl_timer_migration;
+extern unsigned int sysctl_sched_shares_window;
 
 int sched_proc_update_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *length,
@@ -1941,6 +1944,24 @@ int sched_rt_handler(struct ctl_table *table, int write,
 
 extern unsigned int sysctl_sched_compat_yield;
 
+#ifdef CONFIG_SCHED_AUTOGROUP
+extern unsigned int sysctl_sched_autogroup_enabled;
+
+extern void sched_autogroup_create_attach(struct task_struct *p);
+extern void sched_autogroup_detach(struct task_struct *p);
+extern void sched_autogroup_fork(struct signal_struct *sig);
+extern void sched_autogroup_exit(struct signal_struct *sig);
+#ifdef CONFIG_PROC_FS
+extern void proc_sched_autogroup_show_task(struct task_struct *p, struct seq_file *m);
+extern int proc_sched_autogroup_set_nice(struct task_struct *p, int *nice);
+#endif
+#else
+static inline void sched_autogroup_create_attach(struct task_struct *p) { }
+static inline void sched_autogroup_detach(struct task_struct *p) { }
+static inline void sched_autogroup_fork(struct signal_struct *sig) { }
+static inline void sched_autogroup_exit(struct signal_struct *sig) { }
+#endif
+
 #ifdef CONFIG_RT_MUTEXES
 extern int rt_mutex_getprio(struct task_struct *p);
 extern void rt_mutex_setprio(struct task_struct *p, int prio);
@@ -1959,9 +1980,10 @@ extern int task_nice(const struct task_struct *p);
 extern int can_nice(const struct task_struct *p, const int nice);
 extern int task_curr(const struct task_struct *p);
 extern int idle_cpu(int cpu);
-extern int sched_setscheduler(struct task_struct *, int, struct sched_param *);
+extern int sched_setscheduler(struct task_struct *, int,
+			      const struct sched_param *);
 extern int sched_setscheduler_nocheck(struct task_struct *, int,
-				      struct sched_param *);
+				      const struct sched_param *);
 extern struct task_struct *idle_task(int cpu);
 extern struct task_struct *curr_task(int cpu);
 extern void set_curr_task(int cpu, struct task_struct *p);
@@ -2488,7 +2510,7 @@ extern void normalize_rt_tasks(void);
 
 #ifdef CONFIG_CGROUP_SCHED
 
-extern struct task_group init_task_group;
+extern struct task_group root_task_group;
 
 extern struct task_group *sched_create_group(struct task_group *parent);
 extern void sched_destroy_group(struct task_group *tg);
