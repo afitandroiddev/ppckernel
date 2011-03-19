@@ -635,6 +635,17 @@ static enum page_references page_check_references(struct page *page,
 	if (referenced_ptes) {
 		if (PageAnon(page))
 			return PAGEREF_ACTIVATE;
+
+		/*
+		 * Identify referenced, file-backed active pages and move them
+		 * to the active list. We know that this page has been
+		 * referenced since being put on the inactive list. VM_EXEC
+		 * pages are only moved to the inactive list when they have not
+		 * been referenced between scans (see shrink_active_list).
+		 */
+		if ((vm_flags & VM_EXEC) && page_is_file_cache(page))
+			return PAGEREF_ACTIVATE;
+
 		/*
 		 * All mapped pages start out with page table
 		 * references from the instantiating fault, so we need
@@ -2007,7 +2018,8 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 			struct zone *preferred_zone;
 
 			first_zones_zonelist(zonelist, gfp_zone(sc->gfp_mask),
-							NULL, &preferred_zone);
+						&cpuset_current_mems_allowed,
+						&preferred_zone);
 			wait_iff_congested(preferred_zone, BLK_RW_ASYNC, HZ/10);
 		}
 	}
