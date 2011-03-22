@@ -25,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/wakelock.h>
 #include <linux/mutex.h>
+#include <linux/i2c-msm.h>
 #include <mach/system.h>
 
 #define DEBUG 0
@@ -78,7 +79,9 @@ struct msm_i2c_dev {
 	void                *complete;
 	struct wake_lock    wakelock;
 	bool                is_suspended;
-	struct mutex	    mlock;
+	int                 clk_drv_str;
+	int                 dat_drv_str;
+	int                 skip_recover;
 };
 
 #if DEBUG
@@ -334,10 +337,6 @@ msm_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	long timeout;
 	unsigned long flags;
 
-	if (WARN_ON(!num))
-		return -EINVAL;
-
-	mutex_lock(&dev->mlock);
 	/*
 	 * If there is an i2c_xfer after driver has been suspended,
 	 * grab wakelock to abort suspend.
@@ -409,7 +408,6 @@ err:
 	clk_disable(dev->clk);
 	if (dev->is_suspended)
 		wake_unlock(&dev->wakelock);
-	mutex_unlock(&dev->mlock);
 	return ret;
 }
 
@@ -429,12 +427,12 @@ msm_i2c_probe(struct platform_device *pdev)
 {
 	struct msm_i2c_dev	*dev;
 	struct resource		*mem, *irq, *ioarea;
+	struct msm_i2c_device_platform_data *pdata = pdev->dev.platform_data;
 	int ret;
 	int fs_div;
 	int hs_div;
-	int i2c_clk;
+	int i2c_clk, i2c_clock;
 	int clk_ctl;
-	int target_clk;
 	struct clk *clk;
 
 	printk(KERN_INFO "msm_i2c_probe\n");
@@ -479,11 +477,25 @@ msm_i2c_probe(struct platform_device *pdev)
 		goto err_ioremap_failed;
 	}
 
-	mutex_init(&dev->mlock);
 	spin_lock_init(&dev->lock);
 	wake_lock_init(&dev->wakelock, WAKE_LOCK_SUSPEND, "i2c");
 	platform_set_drvdata(pdev, dev);
 
+	if (pdata) {
+		dev->clk_drv_str = pdata->clock_strength;
+		dev->dat_drv_str = pdata->data_strength;
+		if (pdata->i2c_clock < 100000 || pdata->i2c_clock > 400000)
+			i2c_clock = 100000;
+		else
+			i2c_clock = pdata->i2c_clock;
+	} else {
+		dev->clk_drv_str = 0;
+		dev->dat_drv_str = 0;
+		i2c_clock = 100000;
+		dev->skip_recover = 1;
+	}
+
+	if (!dev->skip_recover)
 	msm_set_i2c_mux(false, NULL, NULL);
 
 	clk_enable(clk);
@@ -492,9 +504,7 @@ msm_i2c_probe(struct platform_device *pdev)
 	/* I2C_FS_CLK = I2C_CLK/(2*(FS_DIVIDER_VALUE+3) */
 	/* FS_DIVIDER_VALUE = ((I2C_CLK / I2C_FS_CLK) / 2) - 3 */
 	i2c_clk = 19200000; /* input clock */
-	target_clk = 100000;
-	/* target_clk = 200000; */
-	fs_div = ((i2c_clk / target_clk) / 2) - 3;
+	fs_div = ((i2c_clk / i2c_clock) / 2) - 3;
 	hs_div = 3;
 	clk_ctl = ((hs_div & 0x7) << 8) | (fs_div & 0xff);
 	writel(clk_ctl, dev->base + I2C_CLK_CTL);
@@ -544,9 +554,7 @@ msm_i2c_remove(struct platform_device *pdev)
 	struct msm_i2c_dev	*dev = platform_get_drvdata(pdev);
 	struct resource		*mem;
 
-	mutex_lock(&dev->mlock);
 	dev->is_suspended = true;
-	mutex_unlock(&dev->mlock);
 	mutex_destroy(&dev->mlock);
 	platform_set_drvdata(pdev, NULL);
 	enable_irq(dev->irq);
